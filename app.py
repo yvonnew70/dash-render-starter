@@ -1096,7 +1096,7 @@ def update_popularity(*args):
     picks = set(picks or [])
     is_pick = d["Rank"].isin(picks)
     fig = go.Figure(go.Scattergl(
-        x=d["Votes"], y=d["Rating"], mode="markers", customdata=d[["Rank"]].values,
+        x=d["Votes"], y=d["Rating"], mode="markers", customdata=d[["Rank"]].values.tolist(),
         hoverinfo="none", hovertemplate=None,
         marker=dict(size=np.where(is_pick, 13, 9), color=d["Metascore"].fillna(d["Metascore"].mean()),
                     colorscale=GOLD_SCALE, opacity=0.85, showscale=True,
@@ -1122,8 +1122,8 @@ def update_popularity(*args):
 
 # 7f. Hover tooltips with posters (both scatter plots)
 def _tooltip(hover):
-    if not hover:
-        return False, no_update, no_update
+    if not hover or not hover.get("points") or "customdata" not in hover["points"][0]:
+      return False, no_update, no_update
     pt = hover["points"][0]
     return True, pt["bbox"], tooltip_body(int(pt["customdata"][0]))
 
@@ -1166,7 +1166,7 @@ def update_insights(*args):
     if not with_rev.empty:
         scat.add_trace(go.Scatter(
             x=with_rev[metric], y=with_rev["Revenue"], mode="markers",
-            customdata=with_rev[["Rank"]].values, hoverinfo="none", hovertemplate=None,
+            customdata=with_rev[["Rank"]].values.tolist(), hoverinfo="none", hovertemplate=None,
             marker=dict(size=with_rev["Votes"], sizemode="area", sizeref=2 * df["Votes"].max() / 45 ** 2,
                         sizemin=4, color=GOLD, opacity=0.55, line=dict(color=BG, width=1)),
         ))
@@ -1188,7 +1188,7 @@ def update_insights(*args):
     else:
         bar = go.Figure(go.Bar(
             x=t10["Revenue"], y=[t if len(t) <= 26 else t[:25] + "…" for t in t10["Title"]], orientation="h",
-            customdata=np.stack([t10["Rank"], t10[metric].fillna(0)], axis=1),
+            customdata=np.stack([t10["Rank"], t10[metric].fillna(0)], axis=1).tolist(),
             marker=dict(color=t10[metric], colorscale=GOLD_SCALE, line=dict(width=0)),
             text=[money(v) for v in t10["Revenue"]], textposition="inside", insidetextanchor="end",
             textfont=dict(color=BG, family=FONT),
@@ -1501,3 +1501,6 @@ def render_compare(a, b):
 
 if __name__ == "__main__":
     app.run(debug=True, port=8051)
+
+# Completed
+# Edited

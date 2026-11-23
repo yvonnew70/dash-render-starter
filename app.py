@@ -1123,7 +1123,7 @@ def update_popularity(*args):
 # 7f. Hover tooltips with posters (both scatter plots)
 def _tooltip(hover):
     if not hover or not hover.get("points") or "customdata" not in hover["points"][0]:
-      f  return False, no_update, no_update
+      return False, no_update, no_update
     pt = hover["points"][0]
     return True, pt["bbox"], tooltip_body(int(pt["customdata"][0]))
 

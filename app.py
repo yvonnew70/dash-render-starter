@@ -1503,4 +1503,8 @@ if __name__ == "__main__":
     app.run(debug=True, port=8051)
 
 # Completed
+<<<<<<< HEAD
 # Edited again
+=======
+# Edited
+>>>>>>> 1d09671ed799040257d7fd489b1194dfe2f1a0ea

@@ -4,7 +4,7 @@ Question: Do the movies critics and audiences love actually make money?
           ...and what should we watch tonight?
 Data: IMDB Movie Dataset (1,000 popular movies, 2006–2016), Kaggle.
 
-Run locally:  python app.py   ->  open http://127.0.0.1:8050
+Run locally:  python app.py   ->  open http://127.0.0.1:8051
 Deploy:       Render start command
               gunicorn app:server --workers 2 --threads 8 --timeout 60
 
@@ -1500,4 +1500,4 @@ def render_compare(a, b):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=8051)

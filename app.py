@@ -487,8 +487,3 @@ def show_movie(scatter_click, bar_click):
 if __name__ == "__main__":
     app.run(debug=True)
 
-    #Can you see this
-    # Change 2
-    # Shaboingboing
-    # change 4
-    # CHANGE 5

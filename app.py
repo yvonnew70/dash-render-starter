@@ -1,22 +1,11 @@
 """
-Box Office vs. Buzz — Group 1 Python Dashboard (MIS 480C)
-Question: Do the movies critics and audiences love actually make money?
-          ...and what should we watch tonight?
+PICK A MOVIE, ANY MOVIE — Group 1 Python Dashboard (MIS 480C)
+Question: Do movies that critics and audiences love actually make money, and what should we watch tonight?
 Data: IMDB Movie Dataset (1,000 popular movies, 2006–2016), Kaggle.
 
 Run locally:  python app.py   ->  open http://127.0.0.1:8051
 Deploy:       Render start command
               gunicorn app:server --workers 2 --threads 8 --timeout 60
-
-Posters, trailers and "where to watch":
-  * Works with NO setup: posters come from IMDb's public search feed, trailers from a
-    YouTube search, and "where to watch" shows one-click search links (JustWatch, Netflix...).
-  * Optional, better: set the environment variable TMDB_API_KEY (free key from
-    themoviedb.org -> Settings -> API). Then posters and official trailers come from TMDB
-    and "where to watch" lists the real streaming services for your region
-    (WATCH_REGION, default "US"). On Render: Environment -> Add Environment Variable.
-  * Lookups are cached in media_cache.json next to this file, so each movie is only
-    looked up once.
 """
 import json
 import os
@@ -48,6 +37,11 @@ df["Director"] = df["Director"].str.strip()
 df["GenreList"] = df["Genre"].str.split(",")
 df["ActorList"] = df["Actors"].str.split(",").apply(lambda xs: [a.strip() for a in xs])
 df.index = df["Rank"].values  # look a movie up with df.loc[rank]
+_ws_meta = df["Metascore"].fillna(df["Metascore"].median())
+df["WatchScore"] = (
+    (df["Rating"] - df["Rating"].min()) / (df["Rating"].max() - df["Rating"].min()) * 50
+    + (_ws_meta - _ws_meta.min()) / (_ws_meta.max() - _ws_meta.min()) * 50
+)
 
 ALL_GENRES = sorted(df["GenreList"].explode().unique())
 YEAR_MIN, YEAR_MAX = int(df["Year"].min()), int(df["Year"].max())
@@ -60,6 +54,9 @@ _dir_counts = df["Director"].value_counts()
 DIRECTOR_OPTIONS = [{"label": f"{d}  ({n})", "value": d} for d, n in sorted(_dir_counts.items())]
 MOVIE_OPTIONS = [{"label": f"{r.Title} ({r.Year})", "value": int(r.Rank)}
                  for r in df.sort_values("Votes", ascending=False).itertuples()]
+_cmp_b_mask = df["Title"].str.contains("Transformers.*Age", regex=True, na=False, case=False)
+_CMP_B_DEFAULT = int(df.loc[_cmp_b_mask, "Rank"].iloc[0]) if _cmp_b_mask.any() \
+    else int(df.loc[df["Title"] == "Inception", "Rank"].iloc[0])
 
 SORTS = {
     "popular": ("Most popular (IMDb votes)", "Votes", False),
@@ -71,6 +68,7 @@ SORTS = {
     "shortest": ("Shortest runtime", "Runtime", True),
     "longest": ("Longest runtime", "Runtime", False),
     "title": ("Title A–Z", "Title", True),
+    "watchscore": ("Best to watch tonight (IMDb + critics)", "WatchScore", False),
 }
 
 METRICS = {
@@ -90,7 +88,7 @@ FILTER_INPUTS = [Input(i, "value") for i in FILTER_IDS]
 FILTER_STATES = [State(i, "value") for i in FILTER_IDS]
 
 # ---------------------------------------------------------------------------
-# 2. DESIGN SYSTEM  (change colors here and the whole dashboard follows)
+# 2. DESIGN SYSTEM 
 # ---------------------------------------------------------------------------
 BG = "#000000"        # pure black, like a theater
 CARD = "#0b0b0e"      # card / chart background
@@ -189,7 +187,7 @@ def similar_movies(rank, n=6):
     m = df.loc[rank]
     gset, aset = set(m["GenreList"]), set(m["ActorList"])
     others = df[df["Rank"] != rank]
-    genre_sim = others["GenreList"].apply(lambda gl: len(gset & set(gl)) / len(gset | set(gl)))
+    genre_sim = others["GenreList"].apply(lambda gl: len(gset & set(gl)) / max(len(gset | set(gl)), 1))
     votes_norm = (np.log10(others["Votes"]) - 2) / 4.3            # 0..1 popularity
     bonus = (0.30 * (others["Director"] == m["Director"])
              + 0.12 * others["ActorList"].apply(lambda al: len(aset & set(al)))
@@ -203,7 +201,7 @@ def similar_movies(rank, n=6):
 
 
 # ---------------------------------------------------------------------------
-# 4. POSTERS, TRAILERS, WHERE TO WATCH  (looked up on demand, then cached)
+# 4. POSTERS, TRAILERS, WHERE TO WATCH 
 # ---------------------------------------------------------------------------
 MEDIA_FILE = HERE / "media_cache.json"
 TMDB_KEY = os.environ.get("TMDB_API_KEY", "").strip()
@@ -235,9 +233,9 @@ def _remember(rank, force_save=False, **fields):
         if force_save or _unsaved >= 10:
             try:
                 tmp = MEDIA_FILE.with_suffix(".tmp")
+                _unsaved = 0          # reset before write; crash here won't double-save
                 tmp.write_text(json.dumps(_media))
                 tmp.replace(MEDIA_FILE)
-                _unsaved = 0
             except OSError:
                 pass  # read-only disk: keep the in-memory cache only
 
@@ -392,7 +390,7 @@ if os.environ.get("PREFETCH_MEDIA", "1") != "0":
 # ---------------------------------------------------------------------------
 app = Dash(
     __name__,
-    title="Box Office vs. Buzz",
+    title="Pick a Movie, Any Movie",
     external_stylesheets=["https://fonts.googleapis.com/css2?family=Bebas+Neue&"
                           "family=Inter:wght@400;500;600;700;800&display=swap"],
 )
@@ -523,9 +521,9 @@ app.layout = html.Div(className="page", children=[
         html.Div(className="marquee-inner", children=[
             html.Div(children=[
                 html.Div("★  NOW SHOWING  ·  GROUP 1  ·  MIS 480C  ★", className="eyebrow"),
-                html.H1(["BOX OFFICE ", html.Span("vs.", className="accent"), " BUZZ"]),
-                html.P("1,000 popular films from 2006–2016. Find tonight's movie, then see whether "
-                       "the films critics and audiences love actually make money.", className="lede"),
+                html.H1("PICK A MOVIE, ANY MOVIE"),
+                html.P("Explore 1,000 popular films from 2006–2016, compare critic and audience "
+                       "ratings, and discover your next movie night pick.", className="lede"),
             ]),
             html.Div(className="header-actions", children=[
                 html.A(["🎟  My Picks ", html.Span(id="picks-badge", className="badge")],
@@ -909,9 +907,12 @@ footer { color: MUTED; font-size: 12px; margin-top: 22px; text-align: center; li
   .cmp-grid { grid-template-columns: 1fr 90px 1fr; } .cmp-head img { width: 100px; }
 }
 """
-for _k, _v in {"CARD_2": CARD_2, "CARD": CARD, "BORDER": BORDER, "TEXT": TEXT, "MUTED": MUTED, "GOLD": GOLD,
-               "RED": RED, "DISPLAY": DISPLAY, "FONT": FONT, "BG": BG}.items():
-    CSS = re.sub(rf"\b{_k}\b", _v, CSS)
+# Keys ordered longest-first so "CARD_2" replaces before "CARD" (no partial matches).
+_CSS_VARS = [("CARD_2", CARD_2), ("CARD", CARD), ("BORDER", BORDER), ("TEXT", TEXT),
+             ("MUTED", MUTED), ("GOLD", GOLD), ("RED", RED), ("DISPLAY", DISPLAY),
+             ("FONT", FONT), ("BG", BG)]
+for _k, _v in _CSS_VARS:
+    CSS = CSS.replace(_k, _v)
 
 app.index_string = """<!DOCTYPE html>
 <html>
@@ -1501,7 +1502,3 @@ def render_compare(a, b):
 
 if __name__ == "__main__":
     app.run(debug=True, port=8051)
-
-# Completed
-# Edited again
-# COMPLETED A THRID TIME
